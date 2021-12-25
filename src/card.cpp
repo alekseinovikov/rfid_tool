@@ -1,11 +1,67 @@
 #include <SPI.h>
 #include "card.h"
 
+#define EMPTY_UID              \
+    {                          \
+        0xFF, 0xFF, 0xFF, 0xFF \
+    }
+
 void Card::init()
 {
     SPI.begin(); // Init SPI bus
 
     this->mfrc522.PCD_Init(SS_PIN, RST_PIN);
+}
+
+int Card::setCardUidToZeros()
+{
+    if (!this->mfrc522.PICC_IsNewCardPresent())
+        return 0;
+
+    if (!this->mfrc522.PICC_ReadCardSerial())
+        return 0;
+
+    byte emptyUid[] = EMPTY_UID;
+    bool ok = this->mfrc522.MIFARE_SetUid(emptyUid, (byte)sizeof(emptyUid), false);
+    this->mfrc522.PICC_HaltA();
+    this->mfrc522.PCD_StopCrypto1();
+    if (!ok)
+    {
+        return 2;
+    }
+
+    return 1;
+}
+
+int Card::copyUid(bool alreadyStored)
+{
+    if (!this->mfrc522.PICC_IsNewCardPresent())
+        return 0;
+
+    if (!this->mfrc522.PICC_ReadCardSerial())
+        return 0;
+
+    if (!alreadyStored)
+    {
+        for (byte i = 0; i < 4; i++)
+        {
+            this->nuidBuffer[i] = this->mfrc522.uid.uidByte[i];
+        }
+
+        this->mfrc522.PICC_HaltA();
+        this->mfrc522.PCD_StopCrypto1();
+        return 1;
+    }
+
+    bool ok = this->mfrc522.MIFARE_SetUid(this->nuidBuffer, (byte)sizeof(this->nuidBuffer), false);
+    this->mfrc522.PICC_HaltA();
+    this->mfrc522.PCD_StopCrypto1();
+    if (!ok)
+    {
+        return 3;
+    }
+
+    return 2;
 }
 
 String Card::readUidIfPresentOrEmpty()
